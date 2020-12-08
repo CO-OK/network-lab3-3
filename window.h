@@ -40,6 +40,10 @@ struct thread_item{
     int sock;//套接字描述符
     int port;//端口
     int shake_hand_done;//标志了握手的三个阶段
+    int ssthresh;//拥塞控制的窗口阈值
+    int dupACKcount;//重复ACK计数
+    int MSS;//最大段长度
+    int lastACK;//上一个的seq_num
 };
 
 struct TimeTableItem

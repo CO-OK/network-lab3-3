@@ -34,7 +34,7 @@ int shake_hand_state=-1;
 struct itimerval time_set;
 void ALRM_handler();
 int set_timer(int n_msecs);
-
+void clear_buf(unsigned char*buf);
 int sock;
 char*msg;
 struct sockaddr_in saddr_to,saddr_from;
@@ -61,9 +61,10 @@ int main(int ac,char*av[])
     unsigned char buf_send[buf_len];
     while(1)
     {
+        clear_buf(buf_recv);
         nchars=recvfrom(sock,buf_recv,buf_len,0,(struct sockaddr*)&saddr_from,&saddrlen);
         shake_hand_state=3;
-        printf("3333333recv pkg %d,expect=%d,chars=%d,END=%d\n",read_pkg_num(buf_recv),expect_num,nchars,check_hdr_END(buf_recv[0]));
+        printf("recv pkg %d,expect=%d,chars=%d,END=%d\n",read_pkg_num(buf_recv),expect_num,nchars,check_hdr_END(buf_recv[0]));
         if(check_hdr_END(buf_recv[0])&&read_pkg_num(buf_recv)==expect_num)
         {
             make_pkg_num(buf_send,expect_num);
@@ -76,7 +77,6 @@ int main(int ac,char*av[])
                 exit(8);
             make_pkg_num(buf_send,expect_num);
             Sendto(sock , buf_send, buf_len, 0, (struct sockaddr*)&saddr_to, saddrlen,ACK);
-            printf("recv pkg %d,chars=%d\n",expect_num,nchars);
             printf("send pkt %d\n",expect_num);
             expect_num++;
         }

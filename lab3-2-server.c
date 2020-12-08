@@ -20,7 +20,7 @@ int check_hdr_SYN(char c);
 int check_hdr_ACK(char c);
 int check_hdr_FIN(char c);
 
-
+void clear_buf(unsigned char*buf);
 int make_dgram_server_socket(int PortNum,int QueueNum);//将创建服务器套接字的一些函数集成
 int get_internet_address(char*,int,int*,struct sockaddr_in*);//这个函数目前并未用到
 void say_who_called(struct sockaddr_in *);//这个函数目前并未用到
@@ -198,7 +198,7 @@ void thread_send(void *arg)
     struct thread_item* item=arg;
     
     int pos=find_next_pos(&time_table); //找到时间表中一个合适的位置  
-    printf("pos:%d\n",pos);  
+    //printf("pos:%d\n",pos);  
     TimeTableInsert(&time_table,item,find_next_pos(&time_table));//将项目加入表项
     MakeServerWindow(item->window, window_num);//初始化窗口
     shake_hand(item);//握手
@@ -242,10 +242,12 @@ void thread_recv(void *arg)
     while(item->shake_hand_done!=1);
     while(1)
     {
+        clear_buf(recv);
         nchars=recvfrom(item->sock,recv,buf_len,0,(struct sockaddr*)item->saddr,&(*item->saddrlen));
+       
         if(check_sum(recv,nchars)&&read_pkg_num(recv)==item->window->head->pkg_num)
         {
-            printf("port=%d recv pkg %d\n",item->port,read_pkg_num(recv));
+            printf("port=%d recv pkg %d chars=%d\n",item->port,read_pkg_num(recv),nchars);
             item->window->head=item->window->head->next;//base后移
             item->window->tail=item->window->tail->next;//base后移后多出一个空闲的单窗口
             if(item->window->head==item->window->next_seq_num)//base=next

@@ -15,6 +15,12 @@
 #endif
 //int make_internet_address();
 
+
+void clear_buf(unsigned char* buf)
+{
+    for(int i=0;i<buf_len;i++)
+        buf[i]=0;
+}
 int make_dgram_server_socket(int PortNum,int QueueNum)
 {
     /*
@@ -76,11 +82,6 @@ int check_ac(int ac,int num)
     }
 }
 
-void clear_buf(char*buf)
-{
-    for(int i=0;i<BUFSIZ+1;i++)
-        buf[i]='\0';
-}
 
 void delay(unsigned i)
 {
@@ -217,8 +218,9 @@ int lab3_2_Sendto(int fd, size_t n, int flags, const struct sockaddr *addr, sock
         集成make_hdr make_sum make_pkg_num sendto
     */
     make_hdr(item->send_buf,PRO);
-    make_sum(item->send_buf,n);
+    
     make_pkg_num(item->send_buf,pkg_num);
+    make_sum(item->send_buf,n);
     item->pkg_num=pkg_num;
     item->pkg_size=n;
     return sendto(fd,item->send_buf,n,flags,addr,addr_len);
