@@ -36,7 +36,7 @@ void ALRM_handler();
 int set_timer(int n_msecs);
 void clear_buf(unsigned char*buf);
 int sock;
-char*msg;
+char*msg="";
 struct sockaddr_in saddr_to,saddr_from;
 socklen_t saddrlen;
 int fd;
@@ -50,18 +50,12 @@ int main(int ac,char*av[])
         oops("can not make sockt",2);
     }
     make_internet_address(av[1],atoi(av[2]),&saddr_to);
-    msg="";
-    //客户端三次握手
-    shake_hand(sock,(struct sockaddr*)&saddr_to,(struct sockaddr*)&saddr_from,&saddrlen);
+    shake_hand(sock,(struct sockaddr*)&saddr_to,(struct sockaddr*)&saddr_from,&saddrlen);//客户端三次握手
     if((fd=creat(av[3],0644))==-1)
         oops("create file failed",4);
-    int expect_num=0;
-    int nchars=0;
-    unsigned char buf_recv[buf_len];
-    unsigned char buf_send[buf_len];
+    int expect_num=0;   int nchars=0;   unsigned char buf_recv[buf_len];    unsigned char buf_send[buf_len];
     while(1)
     {
-        clear_buf(buf_recv);
         nchars=recvfrom(sock,buf_recv,buf_len,0,(struct sockaddr*)&saddr_from,&saddrlen);
         shake_hand_state=3;
         printf("recv pkg %d,expect=%d,chars=%d,END=%d\n",read_pkg_num(buf_recv),expect_num,nchars,check_hdr_END(buf_recv[0]));
@@ -69,6 +63,7 @@ int main(int ac,char*av[])
         {
             make_pkg_num(buf_send,expect_num);
             Sendto(sock , buf_send, buf_len, 0, (struct sockaddr*)&saddr_to, saddrlen,END);
+            printf("send END\n");
             break;
         }
         else if(check_sum(buf_recv,nchars)&&read_pkg_num(buf_recv)==expect_num&&!check_hdr_END(buf_recv[0]))
@@ -79,6 +74,12 @@ int main(int ac,char*av[])
             Sendto(sock , buf_send, buf_len, 0, (struct sockaddr*)&saddr_to, saddrlen,ACK);
             printf("send pkt %d\n",expect_num);
             expect_num++;
+        }
+        else
+        {
+            make_pkg_num(buf_send,expect_num-1);
+            Sendto(sock , buf_send, buf_len, 0, (struct sockaddr*)&saddr_to, saddrlen,ACK);
+            printf("resend pkt %d\n",read_pkg_num(buf_recv));
         }
     }
     close(fd);

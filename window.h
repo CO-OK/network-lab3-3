@@ -2,7 +2,7 @@
 #include<sys/socket.h>
 #include<stdlib.h>
 #include<stdio.h>
-#define time_table_num 4 //TimeTable的大小
+#define time_table_num 4 //TimeTable的大小,也是窗口大小
 #define window_num 5 //窗口大小
 struct WindowItem{
     /*
@@ -26,6 +26,8 @@ struct ServerWindow{
 };
 int MakeServerWindow(struct ServerWindow*  window,int n);//初始化窗口
 int DeleteWindow(struct ServerWindow*  window);//删除窗口
+int IncreaseWindow(struct ServerWindow*  window,int n);//增加窗口,n为要增加的数量
+void PrintWindow(struct ServerWindow*  window);//调试用
 struct thread_item{
     /*
         这个结构体存储了一个线程所必需的各种变量
@@ -33,17 +35,27 @@ struct thread_item{
     socklen_t* saddrlen;
     struct ServerWindow *window;//窗口
     struct sockaddr_in* saddr;
+    pthread_t id;//线程表述符
     char* file_name;//文件名
     int timer_stop;//计时器是否需要停止
     int count;//计时器需要用到的计数值
     int pos;//在TimeTable中的位置，方便删除，提高性能
     int sock;//套接字描述符
+    int fd;//文件描述符
     int port;//端口
+    int port_index;
+    int end_count;//当客户端发送的END丢失时，服务器会重发最后几个包，
+                  //为了避免一直重复发送，发送10次后就结束，这个值用来计数
     int shake_hand_done;//标志了握手的三个阶段
+    int pkg_num;//序列号
+    int break_flag;//循环跳出标志
+    int control_state;//拥塞控制的三个状态 0为慢启动，1为拥塞避免，2为快速恢复
     int ssthresh;//拥塞控制的窗口阈值
     int dupACKcount;//重复ACK计数
     int MSS;//最大段长度
     int lastACK;//上一个的seq_num
+    int currentACK;//现在收到的seq_num
+    
 };
 
 struct TimeTableItem
@@ -54,7 +66,6 @@ struct TimeTableItem
     int valid;//表示这一项是否有效（被占用）
     struct thread_item* item;//指向线程结构体
 };
-
 struct TimeTable
 {
     /*
@@ -62,9 +73,9 @@ struct TimeTable
     */
     struct TimeTableItem table[time_table_num];
 };
-int find_next_pos(struct TimeTable* table);
+int find_next_pos(struct TimeTable* table);//找到表中下一个有效位置
+//将一个thread_item*item加入TimeTable
 int TimeTableInsert(struct TimeTable* time_table,struct thread_item*item,int pos);
-
 struct SockPort
 {
     int port;

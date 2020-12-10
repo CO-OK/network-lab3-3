@@ -34,6 +34,37 @@ int DeleteWindow(struct ServerWindow*  window)
     }
     return window->size;
 }
+int IncreaseWindow(struct ServerWindow*  window,int n)//增加窗口,n为要增加的数量
+{
+    //首先构造长度为n的链表,head=tmp_head tail=tmp_tail
+    struct WindowItem*tmp_head=(struct WindowItem*)malloc(sizeof(struct WindowItem));
+    struct WindowItem*tmp=tmp_head;
+    struct WindowItem*tmp_tail;
+    tmp_head->pkg_num=-1;
+    for(int i=0;i<n-1;i++)
+    {
+        tmp->next=(struct WindowItem*)malloc(sizeof(struct WindowItem));
+        tmp->next->pkg_num=-1;
+        tmp_tail=tmp;
+        tmp=tmp->next;
+    }
+    tmp_tail=tmp;
+    
+    //将其加入原来的链表
+    window->tail->next=tmp_head;
+    tmp_tail->next=window->head;
+    window->tail=tmp_tail;
+    window->size=window->size+n;
+    return 0;
+}
+void PrintWindow(struct ServerWindow*  window)
+{
+    int i=0;
+    struct WindowItem*tmp=window->head;
+    for(;i<100;i++)
+        tmp=tmp->next;
+    printf("window:%d\n",i);
+}
 int find_next_pos(struct TimeTable* table)
 {
     /*

@@ -217,8 +217,7 @@ int lab3_2_Sendto(int fd, size_t n, int flags, const struct sockaddr *addr, sock
     /*
         集成make_hdr make_sum make_pkg_num sendto
     */
-    make_hdr(item->send_buf,PRO);
-    
+    make_hdr(item->send_buf,PRO);   
     make_pkg_num(item->send_buf,pkg_num);
     make_sum(item->send_buf,n);
     item->pkg_num=pkg_num;
