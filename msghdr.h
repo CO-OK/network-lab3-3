@@ -3,6 +3,7 @@
 #define SYN 0b01000000   //64
 #define FLG 0b00100000   //32
 #define END 0b00010000   //16
+#define RSD 0b00001000   //8
 #define FIN 0b00000001   //1
 
 #define CLR 0b00000000
@@ -12,7 +13,7 @@
 #endif
 
 #ifndef data_len  //数据长度
-#define data_len 8192
+#define data_len 1024
 #endif
 #ifndef oops     //错误处理
 #define oops(m,x)   {perror(m)  ;exit(x)    ;}

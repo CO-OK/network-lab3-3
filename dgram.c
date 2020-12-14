@@ -177,7 +177,10 @@ int check_hdr_END(char c)
 {
     return ((c&END)==16);
 }
-
+int check_hdr_RSD(char c)
+{
+    return ((c&RSD)==8);
+}
 
 
 

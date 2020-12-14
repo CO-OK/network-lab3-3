@@ -19,6 +19,7 @@ int check_hdr_SYN(char c);
 int check_hdr_ACK(char c);
 int check_hdr_FLG(char c);
 int check_hdr_FIN(char c);
+int check_hdr_RSD(char c);
 int make_dgram_client_socket();
 int make_internet_address(char*,int,struct sockaddr_in*);
 int check_ac(int ac,int num);
@@ -75,11 +76,20 @@ int main(int ac,char*av[])
             printf("send pkt %d\n",expect_num);
             expect_num++;
         }
-        else
+        else 
         {
-            make_pkg_num(buf_send,expect_num-1);
-            Sendto(sock , buf_send, buf_len, 0, (struct sockaddr*)&saddr_to, saddrlen,ACK);
-            printf("resend pkt %d\n",read_pkg_num(buf_recv));
+            /*if(check_hdr_RSD(buf_recv[0]))
+            {
+                make_pkg_num(buf_send,read_pkg_num(buf_recv));
+                Sendto(sock , buf_send, buf_len, 0, (struct sockaddr*)&saddr_to, saddrlen,ACK);
+                printf("resend pkt %d\n",read_pkg_num(buf_recv));
+            }*/
+            //else
+            //{
+                make_pkg_num(buf_send,expect_num-1);
+                Sendto(sock , buf_send, buf_len, 0, (struct sockaddr*)&saddr_to, saddrlen,ACK);
+                printf("resend pkt %d\n",expect_num-1);
+            //}   
         }
     }
     close(fd);
@@ -101,7 +111,6 @@ void shake_hand(int sock,struct sockaddr* saddr_to,struct sockaddr*saddr_from ,s
         //重设计时器
         shake_hand_state=2;
         set_timer(1000);
-        
     }
     else
     {

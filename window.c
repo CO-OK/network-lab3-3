@@ -6,11 +6,14 @@ int MakeServerWindow(struct ServerWindow* window,int n)
         创建一个窗口，是一个大小为n的循环链表
     */
     window->size=n;
+    window->next_window_size=n;
     struct WindowItem*tmp;
     tmp=window->head=malloc(sizeof(struct WindowItem));
+    tmp->pkg_num=-1;
     for(int i=0;i<n-1;i++)
     {
         tmp->next=(struct WindowItem*)malloc(sizeof(struct WindowItem));
+        tmp->next->pkg_num=-1;
         window->tail=tmp;
         tmp=tmp->next;
     }
@@ -34,6 +37,25 @@ int DeleteWindow(struct ServerWindow*  window)
     }
     return window->size;
 }
+void PrintWindow(struct ServerWindow*  window)
+{
+    int i=0;
+    struct WindowItem*tmp=window->head;
+    for(;i<100;i++)
+        tmp=tmp->next;
+    printf("window:%d\n",i);
+}
+int FindRestWindow(struct ServerWindow*  window)
+{
+    int count=0;
+    struct WindowItem*tmp=window->next_seq_num;
+    while (tmp!=window->tail)
+    {
+        tmp=tmp->next;
+        count++;
+    }
+    return count-1;
+}
 int IncreaseWindow(struct ServerWindow*  window,int n)//增加窗口,n为要增加的数量
 {
     //首先构造长度为n的链表,head=tmp_head tail=tmp_tail
@@ -55,16 +77,54 @@ int IncreaseWindow(struct ServerWindow*  window,int n)//增加窗口,n为要增�
     tmp_tail->next=window->head;
     window->tail=tmp_tail;
     window->size=window->size+n;
+    printf("increase\n");
     return 0;
 }
-void PrintWindow(struct ServerWindow*  window)
+
+void DecreaseWindow(struct ServerWindow*  window,int n)
 {
-    int i=0;
-    struct WindowItem*tmp=window->head;
-    for(;i<100;i++)
-        tmp=tmp->next;
-    printf("window:%d\n",i);
+    if(n>window->size)
+    {
+        printf("DecreaseWindow wrong\n");
+        return;
+    }
+    if(n==window->size)
+        return;
+    int rest;
+    int sub=n;
+    if((rest=FindRestWindow(window))==0)
+    {
+        printf("no need to decrease\n");
+        return;
+    }
+    struct WindowItem*tmp1=window->next_seq_num->next;
+    struct WindowItem*tmp2=tmp1->next;
+    while(sub>0&&rest>0)
+    {
+        if(tmp1==window->tail)
+        {
+            /*free(tmp1);
+            sub--;
+            rest--;
+            window->tail=window->next_seq_num;*/
+            break;
+        }
+        else
+        {      
+            free(tmp1);
+            sub--;
+            rest--;
+            window->size--;
+            tmp1=tmp2;
+            tmp2=tmp1->next;
+        }
+
+    }
+    window->next_seq_num->next=tmp1;
+    printf("decrease\n");
 }
+
+
 int find_next_pos(struct TimeTable* table)
 {
     /*

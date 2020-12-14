@@ -20,14 +20,17 @@ struct ServerWindow{
         窗口结构
     */
     int size;//窗口中单窗口数目
+    int next_window_size;//用于拥塞控制
     struct WindowItem* head;//base
     struct WindowItem* tail;//尾指针
     struct WindowItem* next_seq_num;//下一个将要使用的单窗口
+
 };
 int MakeServerWindow(struct ServerWindow*  window,int n);//初始化窗口
 int DeleteWindow(struct ServerWindow*  window);//删除窗口
 int IncreaseWindow(struct ServerWindow*  window,int n);//增加窗口,n为要增加的数量
 void PrintWindow(struct ServerWindow*  window);//调试用
+int FindRestWindow(struct ServerWindow*  window);//返回剩余空闲窗口数
 struct thread_item{
     /*
         这个结构体存储了一个线程所必需的各种变量
@@ -55,7 +58,13 @@ struct thread_item{
     int MSS;//最大段长度
     int lastACK;//上一个的seq_num
     int currentACK;//现在收到的seq_num
-    
+    int resize_window;//当这个值为1时，不能发送数据包，因为窗口大小在减小
+    int dupACKflag;
+    int send_down;
+    int RTT;//往返延迟
+    int RTT_COUNT;
+    double Average_Throughput;
+    int Average_Throughput_Count;
 };
 
 struct TimeTableItem
