@@ -13,7 +13,7 @@
 #endif
 
 #ifndef data_len  //数据长度
-#define data_len 1024
+#define data_len 8192
 #endif
 #ifndef oops     //错误处理
 #define oops(m,x)   {perror(m)  ;exit(x)    ;}

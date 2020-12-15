@@ -230,7 +230,7 @@ void thread_send(void *arg)
     struct thread_item* item=arg;
     int pos=find_next_pos(&time_table); //找到时间表中一个合适的位置  
     TimeTableInsert(&time_table,item,find_next_pos(&time_table));//将项目加入表项
-    MakeServerWindow(item->window, 3);//初始化窗口，慢启动阶段cwnd=1
+    MakeServerWindow(item->window, 2);//初始化窗口，慢启动阶段cwnd=1
     shake_hand(item);//握手
     item->fd=open(item->file_name,O_RDONLY); //打开文件
     printf("open\n");  
@@ -453,7 +453,7 @@ void new_ACK_handle(struct thread_item*item)
     {
         printf("in new ack state 0\n");
  
-        IncreaseWindow(item->window,1);
+        IncreaseWindow(item->window,item->window->size);
         item->dupACKcount=0;
         if(item->window->size>=item->ssthresh)
         {
