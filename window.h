@@ -55,6 +55,7 @@ struct thread_item{
     int MSS;//最大段长度
     int lastACK;//上一个的seq_num
     int currentACK;//现在收到的seq_num
+    unsigned long t;
     
 };
 

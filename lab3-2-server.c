@@ -79,6 +79,7 @@ int main(int ac,char*av[])
             item->break_flag=0;//在线程中用到
             item->end_count=-1;//是否启动最后计数
             item->control_state=0;//刚开始是慢启动
+            item->t=-1;
             //慢启动初始值
             /*code*/
             if((pthread_create(&(item->id),NULL,(void*)&thread_send,(void*)(item)))!=0)
@@ -150,9 +151,12 @@ void ALRM_handler()
         if(time_table.table[i].valid==0)//只对表中有效的线程执行
         {
             time_table.table[i].item->count++;//进行计数自增
+            if(time_table.table[i].item->t>=0)
+                    time_table.table[i].item->t++;
             if(time_table.table[i].item->count==500&&time_table.table[i].item->shake_hand_done==1)//对到时的进行重发
             {
                 time_table.table[i].item->count=0;//重新计时
+                
                 if(!time_table.table[i].item->timer_stop)//如果计时器没有被停止则超时后进行重传
                 {
                     printf("resend port %d\n",time_table.table[i].item->port);
@@ -202,8 +206,9 @@ void thread_send(void *arg)
     struct thread_item* item=arg;
     int pos=find_next_pos(&time_table); //找到时间表中一个合适的位置  
     TimeTableInsert(&time_table,item,find_next_pos(&time_table));//将项目加入表项
-    MakeServerWindow(item->window, 2);//初始化窗口，慢启动阶段cwnd=1
+    MakeServerWindow(item->window, 14);//初始化窗口，慢启动阶段cwnd=1
     shake_hand(item);//握手
+    item->t=0;
     item->fd=open(item->file_name,O_RDONLY); //打开文件
     printf("open\n");  
     //recv
@@ -217,6 +222,7 @@ void thread_send(void *arg)
             break;
         }
     }
+    printf("take time %ld ms\n",item->t);
     release_res(item);
 }
 void recv_handle(struct thread_item*item)
@@ -234,8 +240,14 @@ void recv_handle(struct thread_item*item)
                 item->break_flag=1;
                 break;
             }
-            item->window->head=item->window->head->next;//base后移
-            item->window->tail=item->window->tail->next;//base后移后多出一个空闲的单窗口
+            /*item->window->head=item->window->head->next;//base后移
+            item->window->tail=item->window->tail->next;//base后移后多出一个空闲的单窗口*/
+            while(item->window->head->pkg_num<=item->currentACK&&item->window->head!=item->window->next_seq_num)
+            {
+                item->window->head=item->window->head->next;//base后移
+                //printf("after move back, head->pkg_num=%d\n",read_pkg_num(item->window->head->send_buf));
+                item->window->tail=item->window->tail->next;//base后移后多出一个空闲的单窗口
+            }  
             if(item->window->head==item->window->next_seq_num)//base=next
             {
                 item->timer_stop=1;
