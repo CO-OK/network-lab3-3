@@ -82,17 +82,11 @@ int main(int ac,char*av[])
             item->break_flag=0;//在线程中用到
             item->end_count=-1;//是否启动最后计数
             item->control_state=0;//刚开始是慢启动
-            item->resize_window=0;
-            item->dupACKflag=0;
-            item->ssthresh=15;
-            item->lastACK=-1;
-            item->send_down=0;
-            item->RTT=0;
-            item->RTT_COUNT=0;
-            item->Average_Throughput_Count=0.0;
-            item->Average_Throughput=0;
-            //慢启动初始值
-            /*code*/
+            item->resize_window=0;//是否处在改变窗口大小的过程中，相当于一个锁，避免在窗口改动时超时重发
+            item->dupACKflag=0;//也是一个锁避免在窗口改动时超时重发
+            item->ssthresh=15;//初始阈值
+            item->lastACK=-1;//上一次收到的ack用于判断是否是重复ack
+            item->t=-1;
             if((pthread_create(&(item->id),NULL,(void*)&thread_send,(void*)(item)))!=0)
             {
                 oops("there is somthing wrong when create a new thread\n",1);
@@ -159,53 +153,17 @@ void ALRM_handler()
     */
     for(int i=0;i<time_table_num;i++)
     {
-        if(time_table.table[i].valid==0&&time_table.table[i].item->RTT==1)
-            time_table.table[i].item->RTT_COUNT++;
+        /*if(time_table.table[i].valid==0&&time_table.table[i].item->RTT==1)
+            time_table.table[i].item->RTT_COUNT++;*/
         if(time_table.table[i].valid==0&&time_table.table[i].item->dupACKflag!=1)//只对表中有效的线程执行,并且不处在dupack=3的重置阶段
         {
             time_table.table[i].item->count++;//进行计数自增
-            if(time_table.table[i].item->count==250&&time_table.table[i].item->shake_hand_done==1)//对到时的进行重发
+            if(time_table.table[i].item->t>=0)
+                time_table.table[i].item->t++;
+            if(time_table.table[i].item->count==500&&time_table.table[i].item->shake_hand_done==1)//对到时的进行重发
             {
                 time_table.table[i].item->count=0;//重新计时
                 time_out_handle(time_table.table[i].item);
-                //计算平均吞吐量
-                //double t=(0.75*time_table.table[i].item->window->size*buf_len)/200;
-
-                //printf("Throughput=%fMbps,count=%d\n",t,time_table.table[i].item->RTT_COUNT);
-                //time_table.table[i].item->Average_Throughput+=t;
-                //time_table.table[i].item->Average_Throughput_Count++;
-                /*if(!time_table.table[i].item->timer_stop&&time_table.table[i].item->dupACKflag!=1)//如果计时器没有被停止则超时后进行重传
-                {
-                    printf("resend port %d\n",time_table.table[i].item->port);
-                    //time_out_handle(time_table.table[i].item);
-                    //如果客户端最后一次发送过来的END=1的包丢失，服务器自动发送10次（由item->end_count计数）后结束
-                    if(time_table.table[i].item->end_count>=0)
-                    {
-                        time_table.table[i].item->end_count++;
-                        struct WindowItem*tmp=time_table.table[i].item->window->head;
-                        //重发
-                        while(tmp!=time_table.table[i].item->window->next_seq_num)
-                        {
-                            printf("resend %d\n",tmp->pkg_num);
-                            lab3_2_Sendto(time_table.table[i].item->sock, tmp->pkg_size, 0, (struct sockaddr*)time_table.table[i].item->saddr,\
-                                            *time_table.table[i].item->saddrlen,tmp->send_buf[0],tmp,tmp->pkg_num);
-                            tmp=tmp->next;
-                        }
-                        if(time_table.table[i].item->end_count>=10)
-                        {
-                            //结束线程
-                            pthread_cancel(time_table.table[i].item->id);
-                            release_res(time_table.table[i].item);
-                            printf("wrong exit\n");
-                        }
-                    }
-                    else
-                    {
-                        time_out_handle(time_table.table[i].item);
-                    }
-                    
-                    
-                }*/
                 
             }
             //若握手时出现丢包
@@ -232,14 +190,12 @@ void thread_send(void *arg)
     TimeTableInsert(&time_table,item,find_next_pos(&time_table));//将项目加入表项
     MakeServerWindow(item->window, 2);//初始化窗口，慢启动阶段cwnd=1
     shake_hand(item);//握手
+    item->t=0;
     item->fd=open(item->file_name,O_RDONLY); //打开文件
     printf("open\n");  
-    //recv
     while(1)
     {
         send_handle(item);
-        //item->RTT=1;
-        //item->RTT_COUNT=0;
         recv_handle(item);
         if(item->break_flag)
         {
@@ -247,7 +203,7 @@ void thread_send(void *arg)
             break;
         }
     }
-    //printf("Total Throughput=%f\n",item->Average_Throughput/item->Average_Throughput_Count);
+    printf("take time %ld ms\n",item->t);
     release_res(item);
     close(item->fd); 
 }
@@ -258,10 +214,10 @@ void recv_handle(struct thread_item*item)
     while(item->window->head!=item->window->next_seq_num)
     {
         nchars=recvfrom(item->sock,recv,buf_len,0,(struct sockaddr*)item->saddr,&(*item->saddrlen));
-        printf("port=%d recv pkg %d  head->pkg_num=%d currentACK=%d \n",item->port,read_pkg_num(recv),item->window->head->pkg_num,item->currentACK);
+        printf("port=%d recv pkg %d  head->pkg_num=%d currentACK=%d \n",item->port,\
+            read_pkg_num(recv),item->window->head->pkg_num,item->currentACK);
         if(check_sum(recv,nchars))//收到的包校验和是否正确
         {
-            item->RTT=0;
             if(check_hdr_END(recv[0]))//收到返回的END则退出
             {
                 item->break_flag=1;
@@ -346,22 +302,25 @@ void recv_handle(struct thread_item*item)
 void send_handle(struct thread_item*item)
 {
     int nchars=0;
-    while(item->window->tail!=item->window->next_seq_num&&!item->resize_window)//只要next_seq_num不到达窗口末尾且窗口没在重整，就继续发送
+    //只要next_seq_num不到达窗口末尾且窗口没在重整，就继续发送
+    while(item->window->tail!=item->window->next_seq_num&&!item->resize_window)
     {
         nchars=read(item->fd,item->window->next_seq_num->send_buf+offset,buf_len-offset);//读取文件到数据段
         printf("nchars=%d\n",nchars);
         if(nchars==0)//如果读完，则发送带END的信息
         {
-            lab3_2_Sendto(item->sock, nchars+offset, 0, (struct sockaddr*)item->saddr,*item->saddrlen,END,item->window->next_seq_num,item->pkg_num);
+            lab3_2_Sendto(item->sock, nchars+offset, 0, (struct sockaddr*)item->saddr,*item->saddrlen,\
+                END,item->window->next_seq_num,item->pkg_num);
             printf("port %d send end pkg %d\n",item->port,item->pkg_num);
             item->count=0;//重新计时
             item->end_count=0;//开始结束时的计数
-            item->send_down=1;
+            //item->send_down=1;
             item->window->next_seq_num=item->window->next_seq_num->next;//next_seq_num后移
             printf("port %d server send done\n",item->port);
             break;
         }
-        lab3_2_Sendto(item->sock, nchars+offset, 0, (struct sockaddr*)item->saddr,*item->saddrlen,ACK,item->window->next_seq_num,item->pkg_num);
+        lab3_2_Sendto(item->sock, nchars+offset, 0, (struct sockaddr*)item->saddr,*item->saddrlen,\
+                ACK,item->window->next_seq_num,item->pkg_num);
         printf("port %d send pkg %d , len=%d\n",item->port,item->pkg_num,offset+nchars);
         item->pkg_num++;//发送完之后序列号自增
         if(item->window->head==item->window->next_seq_num)
@@ -453,7 +412,7 @@ void new_ACK_handle(struct thread_item*item)
     {
         printf("in new ack state 0\n");
  
-        IncreaseWindow(item->window,item->window->size);
+        IncreaseWindow(item->window,item->window->size);//增加窗口
         item->dupACKcount=0;
         if(item->window->size>=item->ssthresh)
         {
@@ -466,7 +425,7 @@ void new_ACK_handle(struct thread_item*item)
     {
         printf("in new ack state 1\n");
  
-        IncreaseWindow(item->window,1);
+        IncreaseWindow(item->window,1);//增加窗口
         item->dupACKcount=0;
         return;
     }
@@ -474,14 +433,7 @@ void new_ACK_handle(struct thread_item*item)
     {
         printf("int new ack state 2\n");
         item->window->next_window_size=item->ssthresh;
-        /*if(item->window->next_window_size>item->window->size)
-        {
-            IncreaseWindow(item->window,item->window->next_window_size-item->window->size);
-        }
-        else if(item->window->next_window_size<item->window->size)
-        {
-            DecreaseWindow(item->window,item->window->next_window_size-item->window->size);
-        }*/
+        //减小窗口
         DecreaseWindow(item->window,item->window->next_window_size-item->window->size);
         item->dupACKcount=0;
         item->control_state=1;
@@ -490,26 +442,7 @@ void new_ACK_handle(struct thread_item*item)
 
 void time_out_handle(struct thread_item*item)
 {
-    //首先重传然后接收，确保所有包都传到后再减小窗口
     item->resize_window=1;
-    //cwnd=1;
-    //先等待所有包都收到
-    /*while(!item->timer_stop)
-    {
-        printf("resend port %d\n",item->port);
-        struct WindowItem*tmp=item->window->head;
-        //重发
-        while(tmp!=item->window->next_seq_num)
-        {
-            printf("resend %d\n",tmp->pkg_num);
-            lab3_2_Sendto(item->sock, tmp->pkg_size, 0, (struct sockaddr*)item->saddr,\
-                            *item->saddrlen,tmp->send_buf[0],tmp,tmp->pkg_num);
-            tmp=tmp->next;
-        }
-        usleep(500000);//还是每隔500ms发
-    }
-    //窗口调整为1
-    DecreaseWindow(item->window, item->window->size-2);*/
     item->ssthresh=item->window->size/2;//ssthresh=cwnd/2
     struct WindowItem*tmp=item->window->head;
     struct WindowItem*tmp1=tmp->next;
@@ -520,7 +453,6 @@ void time_out_handle(struct thread_item*item)
         item->pkg_num--;
         tmp1=tmp1->next;
     }
-    //lseek(item->fd,tmp1->pkg_size-offset,SEEK_CUR);
     //开始重整窗口，用一个新的取代旧的
     tmp1=tmp->next;
     struct ServerWindow* new_window=malloc(sizeof(struct ServerWindow));//初始化窗口
@@ -543,10 +475,7 @@ void time_out_handle(struct thread_item*item)
     //char c=tmp->send_buf[0];
     lab3_2_Sendto(item->sock, tmp->pkg_size, 0, (struct sockaddr*)item->saddr,\
         *item->saddrlen,tmp->send_buf[0],tmp,tmp->pkg_num);
-    //item->window->next_seq_num=item->window->next_seq_num->next;
     item->control_state=2;
-    //make_hdr(tmp->send_buf,c);
-    //dupACK=0
     item->dupACKcount=0;
     switch(item->control_state)
     {

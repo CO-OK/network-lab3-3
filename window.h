@@ -59,12 +59,8 @@ struct thread_item{
     int lastACK;//上一个的seq_num
     int currentACK;//现在收到的seq_num
     int resize_window;//当这个值为1时，不能发送数据包，因为窗口大小在减小
-    int dupACKflag;
-    int send_down;
-    int RTT;//往返延迟
-    int RTT_COUNT;
-    double Average_Throughput;
-    int Average_Throughput_Count;
+    int dupACKflag;//重复ack标志，是一个互斥锁
+    unsigned long t;
 };
 
 struct TimeTableItem
